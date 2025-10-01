@@ -1,28 +1,25 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-require("dotenv").config();
+const axios = require("axios");
 
 const app = express();
 app.use(bodyParser.json());
 
-const token = process.env.WHATSAPP_TOKEN;
-const phoneNumberId = process.env.PHONE_NUMBER_ID;
-const graphVer = process.env.GRAPH_VER;
-const verifyToken = process.env.VERIFY_TOKEN || "planmaxdigital"; // Usa el que pusiste en Facebook
-
-// 📌 Ruta principal
+// Ruta principal
 app.get("/", (req, res) => {
-  res.send("✅ Bot PlanMax Digital funcionando...");
+  res.send("Servidor de WhatsApp Bot funcionando 🚀");
 });
 
-// 📌 Webhook para verificación
+// Verificación del Webhook
 app.get("/webhook", (req, res) => {
+  const VERIFY_TOKEN = "planmaxdigital"; // usa el mismo que pusiste en Facebook
+
   const mode = req.query["hub.mode"];
-  const challenge = req.query["hub.challenge"];
   const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
 
   if (mode && token) {
-    if (mode === "subscribe" && token === verifyToken) {
+    if (mode === "subscribe" && token === VERIFY_TOKEN) {
       console.log("Webhook verificado ✅");
       res.status(200).send(challenge);
     } else {
@@ -31,44 +28,48 @@ app.get("/webhook", (req, res) => {
   }
 });
 
-// 📌 Webhook para recibir mensajes
+// Recibir mensajes
 app.post("/webhook", (req, res) => {
   let body = req.body;
+  console.log(JSON.stringify(body, null, 2));
 
   if (body.object) {
-    console.log(JSON.stringify(body, null, 2));
+    if (
+      body.entry &&
+      body.entry[0].changes &&
+      body.entry[0].changes[0].value.messages
+    ) {
+      let phone_number_id = body.entry[0].changes[0].value.metadata.phone_number_id;
+      let from = body.entry[0].changes[0].value.messages[0].from; 
+      let msg_body = body.entry[0].changes[0].value.messages[0].text.body;
+
+      // Responder el mismo mensaje
+      axios({
+        method: "POST",
+        url: https://graph.facebook.com/${process.env.GRAPH_VER}/${process.env.PHONE_NUMBER_ID}/messages,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: Bearer ${process.env.WHATSAPP_TOKEN},
+        },
+        data: {
+          messaging_product: "whatsapp",
+          to: from,
+          text: { body: Recibí tu mensaje: ${msg_body} },
+        },
+      })
+        .then(() => {
+          console.log("Mensaje enviado ✅");
+        })
+        .catch((err) => {
+          console.error("Error enviando mensaje ❌", err.response?.data || err);
+        });
+    }
     res.sendStatus(200);
   } else {
     res.sendStatus(404);
   }
 });
 
-// 📌 Enviar mensaje de prueba
-app.get("/send-message", async (req, res) => {
-  const fetch = (await import("node-fetch")).default;
-
-  const url = https://graph.facebook.com/${graphVer}/${phoneNumberId}/messages;
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: Bearer ${token},
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to: "5217711887705", // 👈 pon aquí tu número para pruebas
-      type: "text",
-      text: { body: "Hola! Esto es un mensaje de prueba desde mi bot 🚀" },
-    }),
-  });
-
-  const data = await response.json();
-  res.send(data);
-});
-
-// Puerto
+// Puerto para Render
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(🚀 Servidor corriendo en puerto ${PORT});
-});
+app.listen(PORT, () => console.log("Servidor corriendo en puerto " + PORT));
