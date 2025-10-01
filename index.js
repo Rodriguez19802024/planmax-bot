@@ -5,71 +5,61 @@ const axios = require("axios");
 const app = express();
 app.use(bodyParser.json());
 
-// Ruta principal
-app.get("/", (req, res) => {
-  res.send("Servidor de WhatsApp Bot funcionando 🚀");
-});
+// ENV (pon estos en Render)
+const VERIFY_TOKEN    = "planmaxdigital";
+const GRAPH_VER       = process.env.GRAPH_VER || "v20.0";
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const WHATSAPP_TOKEN  = process.env.WHATSAPP_TOKEN;
 
-// Verificación del Webhook
+// Healthcheck
+app.get("/", (_req, res) => res.send("OK"));
+
+// Verificación de webhook (GET)
 app.get("/webhook", (req, res) => {
-  const VERIFY_TOKEN = "planmaxdigital"; // usa el mismo que pusiste en Facebook
-
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  if (mode && token) {
-    if (mode === "subscribe" && token === VERIFY_TOKEN) {
-      console.log("Webhook verificado ✅");
-      res.status(200).send(challenge);
-    } else {
-      res.sendStatus(403);
-    }
+  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+    return res.status(200).send(challenge);
   }
+  return res.sendStatus(403);
 });
 
-// Recibir mensajes
-app.post("/webhook", (req, res) => {
-  let body = req.body;
-  console.log(JSON.stringify(body, null, 2));
+// Recepción de mensajes (POST)
+app.post("/webhook", async (req, res) => {
+  res.sendStatus(200); // responde rápido a Meta
 
-  if (body.object) {
-    if (
-      body.entry &&
-      body.entry[0].changes &&
-      body.entry[0].changes[0].value.messages
-    ) {
-      let phone_number_id = body.entry[0].changes[0].value.metadata.phone_number_id;
-      let from = body.entry[0].changes[0].value.messages[0].from; 
-      let msg_body = body.entry[0].changes[0].value.messages[0].text.body;
+  try {
+    const msg = req.body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+    if (!msg) return;
 
-      // Responder el mismo mensaje
-      axios({
-        method: "POST",
-        url: https://graph.facebook.com/${process.env.GRAPH_VER}/${process.env.PHONE_NUMBER_ID}/messages,
+    const from = msg.from;
+    const text = msg.text?.body || "";
+
+    // ⚠️ OJO: la URL DEBE ESTAR ENTRE BACKTICKS ` `
+    const apiUrl = https://graph.facebook.com/${GRAPH_VER}/${PHONE_NUMBER_ID}/messages;
+
+    await axios.post(
+      apiUrl,
+      {
+        messaging_product: "whatsapp",
+        to: from,
+        type: "text",
+        text: { body: Hola 👋 recibí: "${text}" }
+      },
+      {
         headers: {
-          "Content-Type": "application/json",
-          Authorization: Bearer ${process.env.WHATSAPP_TOKEN},
-        },
-        data: {
-          messaging_product: "whatsapp",
-          to: from,
-          text: { body: Recibí tu mensaje: ${msg_body} },
-        },
-      })
-        .then(() => {
-          console.log("Mensaje enviado ✅");
-        })
-        .catch((err) => {
-          console.error("Error enviando mensaje ❌", err.response?.data || err);
-        });
-    }
-    res.sendStatus(200);
-  } else {
-    res.sendStatus(404);
+          Authorization: Bearer ${WHATSAPP_TOKEN},
+          "Content-Type": "application/json"
+        }
+      }
+    );
+  } catch (err) {
+    console.error("❌ Error enviando:", err.response?.data || err.message);
   }
 });
 
-// Puerto para Render
+// Puerto dinámico para Render
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Servidor corriendo en puerto " + PORT));
+app.listen(PORT, () => console.log(✅ Bot escuchando en puerto ${PORT}));
