@@ -1,61 +1,38 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const axios = require("axios");
+import express from "express";
+import bodyParser from "body-parser";
 
-const app = express();
-app.use(bodyParser.json());
+const app = express().use(bodyParser.json());
 
-// ===== CONFIG =====
-const VERIFY_TOKEN    = "planmaxdigital";                 // Debe coincidir con Meta
-const GRAPH_VER       = process.env.GRAPH_VER || "v20.0"; // v19.0 o v20.0
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;      // ID numérico
-const WHATSAPP_TOKEN  = process.env.WHATSAPP_TOKEN;       // Token EAA...
+const token = process.env.WHATSAPP_TOKEN;
+const phoneId = process.env.PHONE_NUMBER_ID;
+const version = process.env.GRAPH_VER;
 
-// Salud
-app.get("/", (_req, res) => res.send("OK"));
-
-// Verificación webhook (GET)
-app.get("/webhook", (req, res) => {
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
-  if (mode === "subscribe" && token === VERIFY_TOKEN) return res.status(200).send(challenge);
-  return res.sendStatus(403);
+app.get("/", (req, res) => {
+  res.send("Bot activo ✅");
 });
 
-// Recepción de mensajes (POST)
-app.post("/webhook", async (req, res) => {
-  res.sendStatus(200); // responder rápido a Meta
-  try {
-    const msg = req.body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-    if (!msg) return;
+// Webhook verification
+app.get("/webhook", (req, res) => {
+  const verifyToken = "planmaxdigital"; // tu mismo identificador de verificación
 
-    const from = msg.from;
-    const text = msg.text?.body || "";
+  const mode = req.query["hub.mode"];
+  const challenge = req.query["hub.challenge"];
+  const tokenReq = req.query["hub.verify_token"];
 
-    // * ESTA LÍNEA ES CLAVE: ENTRE BACKTICKS ` ` *
-    const apiUrl = https://graph.facebook.com/${GRAPH_VER}/${PHONE_NUMBER_ID}/messages;
-
-    await axios.post(
-      apiUrl,
-      {
-        messaging_product: "whatsapp",
-        to: from,
-        type: "text",
-        text: { body: Hola 👋 recibí: "${text}" }
-      },
-      {
-        headers: {
-          Authorization: Bearer ${WHATSAPP_TOKEN},
-          "Content-Type": "application/json"
-        }
-      }
-    );
-  } catch (err) {
-    console.error("❌ Error enviando:", err.response?.data || err.message);
+  if (mode && tokenReq && mode === "subscribe" && tokenReq === verifyToken) {
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
   }
 });
 
-// Puerto dinámico (Render)
+// Endpoint para mensajes
+app.post("/webhook", (req, res) => {
+  console.log("Mensaje entrante:", JSON.stringify(req.body, null, 2));
+  res.sendStatus(200);
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(✅ Bot escuchando en puerto ${PORT}))
+app.listen(PORT, () => {
+  console.log("Servidor corriendo en puerto " + PORT);
+});
